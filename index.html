@@ -105,7 +105,7 @@
       });
     }
 
-    function ingresarAApp() {
+function ingresarAApp() {
       const u = document.getElementById('select-usuario').value;
       if (!u) return alert("Selecciona un operador.");
       usuarioActivo = u;
@@ -124,6 +124,7 @@
         document.getElementById('lbl-usuario').innerText = u;
         document.getElementById('lbl-rol').innerText = d.rol || "Operador";
         
+        // CORRECCIÓN: Si hay pendiente, forzar visualmente el cronómetro sin lanzar alertas bloqueantes
         if (estado.tienePendiente) {
           tareaActiva = estado.actividad;
           document.getElementById('lbl-tarea-activa').innerText = estado.actividad;
@@ -132,8 +133,6 @@
           document.getElementById('box-seleccion-tarea').classList.add('hidden');
           document.getElementById('box-cronometro').classList.remove('hidden');
           cambiarPantalla('pantalla-operacion');
-          
-          alert(`⚠️ Tienes una actividad pendiente en proceso:\n"${estado.actividad}"\nIniciada a las ${estado.horaInicio}. Por favor, termínala.`);
         } else {
           const c = document.getElementById('contenedor-botones'); c.innerHTML = "";
           d.tareas.forEach(t => {
@@ -166,6 +165,11 @@
           document.getElementById('lbl-hora-inicio').innerText = res.horaInicio;
           document.getElementById('box-seleccion-tarea').classList.add('hidden');
           document.getElementById('box-cronometro').classList.remove('hidden');
+        } else if(res.status === 'alerta') {
+          // CORRECCIÓN EXTRA: Si por algún motivo da clic a un botón y ya existía en la base de datos,
+          // la app lo redirige inmediatamente a la pantalla de cierre en lugar de trabarse.
+          alert(res.message);
+          ingresarAApp(); // Forzar recarga de estado
         } else { alert(res.message); }
       });
     }
