@@ -11,7 +11,7 @@
 <body class="bg-slate-100 min-h-screen flex flex-col items-center p-4">
 
   <div class="w-full max-w-md bg-white rounded-3xl shadow-xl p-6 mt-4 border border-slate-200">
-    
+
     <div class="text-center mb-6">
       <h1 class="text-2xl font-bold text-slate-800">CEDIS - Inventarios</h1>
       <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Mapeo de Tiempos Opex</p>
@@ -42,9 +42,11 @@
       </div>
 
       <div id="box-cronometro" class="hidden bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-center space-y-4">
-        <span class="inline-block bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse uppercase">En Progreso</span>
+        <span id="badge-reanudado" class="hidden inline-block bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase">Reanudado</span>
+        <span id="badge-progreso" class="inline-block bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse uppercase">En Progreso</span>
         <h3 id="lbl-tarea-activa" class="font-bold text-lg text-emerald-900">-</h3>
         <p class="text-xs text-emerald-700">Iniciado a las: <span id="lbl-hora-inicio" class="font-bold">00:00:00</span></p>
+        <p class="text-xs text-emerald-700">Tiempo transcurrido: <span id="lbl-tiempo-transcurrido" class="font-bold">00:00:00</span></p>
         <button onclick="abrirCierreActividad()" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-red-200">
           ■ Finalizar Actividad
         </button>
@@ -76,9 +78,22 @@
     <p id="overlay-msg">Conectando...</p>
   </div>
 
+  <!-- Banner propio para reemplazar alert() nativo: no truena diálogo del navegador -->
+  <div id="banner" class="hidden fixed top-4 left-1/2 -translate-x-1/2 z-[60] w-[92%] max-w-md">
+    <div id="banner-card" class="rounded-2xl shadow-xl p-4 text-sm font-semibold text-white flex justify-between items-start gap-3">
+      <span id="banner-msg" class="leading-snug">-</span>
+      <button onclick="ocultarBanner()" class="font-bold opacity-80 hover:opacity-100">✕</button>
+    </div>
+  </div>
+
   <script src="config.js"></script>
   <script>
-    let CONFIG = {}; let usuarioActivo = ""; let tareaActiva = "";
+    let CONFIG = {};
+    let usuarioActivo = "";
+    let tareaActiva = "";
+    let timerInterval = null;
+    let horaInicioTimestamp = null;
+    let bannerTimeout = null;
 
     window.addEventListener('DOMContentLoaded', () => {
       mostrarLoading("Cargando lista de operadores...");
@@ -88,7 +103,12 @@
           CONFIG = data;
           inicializarSelector();
           ocultarLoading();
-        }).catch(err => alert("Error conectando con el Sheet: " + err));
+        })
+        .catch(err => {
+          ocultarLoading();
+          mostrarBanner("No se pudo cargar la lista de operadores. Revisa tu conexión y recarga la página.", "error");
+          console.error(err);
+        });
     });
 
     function mostrarLoading(msg) {
@@ -96,6 +116,18 @@
       document.getElementById('overlay').classList.remove('hidden');
     }
     function ocultarLoading() { document.getElementById('overlay').classList.add('hidden'); }
+
+    // Reemplaza alert(): notificación propia, no bloqueante, con color según tipo.
+    function mostrarBanner(msg, tipo = "info") {
+      const card = document.getElementById('banner-card');
+      card.className = "rounded-2xl shadow-xl p-4 text-sm font-semibold text-white flex justify-between items-start gap-3 " +
+        (tipo === "error" ? "bg-red-500" : tipo === "exito" ? "bg-emerald-600" : "bg-amber-500");
+      document.getElementById('banner-msg').innerText = msg;
+      document.getElementById('banner').classList.remove('hidden');
+      clearTimeout(bannerTimeout);
+      bannerTimeout = setTimeout(ocultarBanner, 5000);
+    }
+    function ocultarBanner() { document.getElementById('banner').classList.add('hidden'); }
 
     function inicializarSelector() {
       const s = document.getElementById('select-usuario');
@@ -105,13 +137,13 @@
       });
     }
 
-function ingresarAApp() {
+    function ingresarAApp() {
       const u = document.getElementById('select-usuario').value;
-      if (!u) return alert("Selecciona un operador.");
+      if (!u) return mostrarBanner("Selecciona un operador.", "error");
       usuarioActivo = u;
-      
+
       mostrarLoading("Verificando si tienes tareas pendientes...");
-      
+
       fetch(CONFIG_APP.URL_API_GOOGLE, {
         method: 'POST',
         body: JSON.stringify({ accion: 'VERIFICAR', usuario: u })
@@ -119,19 +151,13 @@ function ingresarAApp() {
       .then(res => res.json())
       .then(estado => {
         ocultarLoading();
-        
+
         const d = CONFIG.actividadesPorRol[u] || { rol: "Operador", tareas: [] };
         document.getElementById('lbl-usuario').innerText = u;
         document.getElementById('lbl-rol').innerText = d.rol || "Operador";
-        
-        // CORRECCIÓN: Si hay pendiente, forzar visualmente el cronómetro sin lanzar alertas bloqueantes
+
         if (estado.tienePendiente) {
-          tareaActiva = estado.actividad;
-          document.getElementById('lbl-tarea-activa').innerText = estado.actividad;
-          document.getElementById('lbl-hora-inicio').innerText = estado.horaInicio;
-          
-          document.getElementById('box-seleccion-tarea').classList.add('hidden');
-          document.getElementById('box-cronometro').classList.remove('hidden');
+          mostrarCronometro(estado.actividad, estado.horaInicio, { reanudado: false });
           cambiarPantalla('pantalla-operacion');
         } else {
           const c = document.getElementById('contenedor-botones'); c.innerHTML = "";
@@ -146,9 +172,11 @@ function ingresarAApp() {
           document.getElementById('box-seleccion-tarea').classList.remove('hidden');
           cambiarPantalla('pantalla-operacion');
         }
-      }).catch(err => {
+      })
+      .catch(err => {
         ocultarLoading();
-        alert("Error verificando estado: " + err);
+        mostrarBanner("Error verificando estado. Intenta de nuevo.", "error");
+        console.error(err);
       });
     }
 
@@ -158,23 +186,69 @@ function ingresarAApp() {
       fetch(CONFIG_APP.URL_API_GOOGLE, {
         method: 'POST',
         body: JSON.stringify({ accion: 'PLAY', usuario: usuarioActivo, actividad: t })
-      }).then(res => res.json()).then(res => {
+      })
+      .then(res => res.json())
+      .then(res => {
         ocultarLoading();
-        if(res.status === 'ok') {
-          document.getElementById('lbl-tarea-activa').innerText = t;
-          document.getElementById('lbl-hora-inicio').innerText = res.horaInicio;
-          document.getElementById('box-seleccion-tarea').classList.add('hidden');
-          document.getElementById('box-cronometro').classList.remove('hidden');
-        } else if(res.status === 'alerta') {
-          // CORRECCIÓN EXTRA: Si por algún motivo da clic a un botón y ya existía en la base de datos,
-          // la app lo redirige inmediatamente a la pantalla de cierre en lugar de trabarse.
-          alert(res.message);
-          ingresarAApp(); // Forzar recarga de estado
-        } else { alert(res.message); }
+        if (res.status === 'ok') {
+          mostrarCronometro(t, res.horaInicio, { reanudado: false });
+        } else if (res.status === 'alerta') {
+          // Ya existía una actividad abierta para este usuario (detectada hasta ahora por el
+          // servidor en la acción PLAY, no en VERIFICAR — revisar esa inconsistencia en el backend).
+          // En vez de alert() + relanzar todo el login, reanudamos directo con los datos que
+          // el propio servidor ya nos da, si vienen incluidos en la respuesta.
+          if (res.actividad && res.horaInicio) {
+            mostrarBanner("Ya tenías esta actividad abierta. La reanudamos.", "alerta");
+            mostrarCronometro(res.actividad, res.horaInicio, { reanudado: true });
+          } else {
+            // El backend no incluyó los datos de la tarea pendiente en la respuesta de "alerta":
+            // como respaldo, sí hace falta volver a consultar VERIFICAR.
+            mostrarBanner(res.message || "Ya tienes una actividad en progreso.", "alerta");
+            ingresarAApp();
+          }
+        } else {
+          mostrarBanner(res.message || "No se pudo iniciar la actividad.", "error");
+        }
+      })
+      .catch(err => {
+        ocultarLoading();
+        mostrarBanner("Error de conexión al iniciar la actividad. Intenta de nuevo.", "error");
+        console.error(err);
       });
     }
 
+    function mostrarCronometro(actividad, horaInicio, { reanudado }) {
+      document.getElementById('lbl-tarea-activa').innerText = actividad;
+      document.getElementById('lbl-hora-inicio').innerText = horaInicio;
+      document.getElementById('badge-reanudado').classList.toggle('hidden', !reanudado);
+
+      document.getElementById('box-seleccion-tarea').classList.add('hidden');
+      document.getElementById('box-cronometro').classList.remove('hidden');
+
+      iniciarTimer(horaInicio);
+    }
+
+    // Cronómetro en vivo: útil para ver de un vistazo cuánto lleva corriendo una tarea reanudada.
+    function iniciarTimer(horaInicioStr) {
+      clearInterval(timerInterval);
+      const hoy = new Date();
+      const [hh, mm, ss] = horaInicioStr.split(':').map(Number);
+      horaInicioTimestamp = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), hh, mm, ss || 0).getTime();
+
+      const actualizar = () => {
+        let diff = Math.floor((Date.now() - horaInicioTimestamp) / 1000);
+        if (diff < 0) diff = 0;
+        const h = String(Math.floor(diff / 3600)).padStart(2, '0');
+        const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+        const s = String(diff % 60).padStart(2, '0');
+        document.getElementById('lbl-tiempo-transcurrido').innerText = `${h}:${m}:${s}`;
+      };
+      actualizar();
+      timerInterval = setInterval(actualizar, 1000);
+    }
+
     function abrirCierreActividad() {
+      clearInterval(timerInterval);
       document.getElementById('lbl-resumen-tarea').innerText = "Terminaste: " + tareaActiva;
       cambiarPantalla('pantalla-cierre');
     }
@@ -182,20 +256,29 @@ function ingresarAApp() {
     function confirmarCierreActividad() {
       const cant = document.getElementById('txt-cantidad').value;
       const comm = document.getElementById('txt-comentarios').value;
-      if(!cant || cant <= 0) return alert("Coloca una cantidad válida.");
-      
+      if (!cant || cant <= 0) return mostrarBanner("Coloca una cantidad válida.", "error");
+
       mostrarLoading("Inyectando registros en MasterData...");
       fetch(CONFIG_APP.URL_API_GOOGLE, {
         method: 'POST',
         body: JSON.stringify({ accion: 'STOP', usuario: usuarioActivo, cantidad: cant, comentarios: comm })
-      }).then(res => res.json()).then(res => {
+      })
+      .then(res => res.json())
+      .then(res => {
         ocultarLoading();
-        if(res.status === 'ok') {
-          alert(`¡Guardado con Éxito!\nTiempo registrado: ${res.tiempo}`);
+        if (res.status === 'ok') {
+          mostrarBanner(`¡Guardado con éxito! Tiempo registrado: ${res.tiempo}`, "exito");
           document.getElementById('box-cronometro').classList.add('hidden');
           document.getElementById('box-seleccion-tarea').classList.remove('hidden');
           cambiarPantalla('pantalla-operacion');
-        } else { alert(res.message); }
+        } else {
+          mostrarBanner(res.message || "No se pudo guardar el registro.", "error");
+        }
+      })
+      .catch(err => {
+        ocultarLoading();
+        mostrarBanner("Error de conexión al guardar. Tu actividad sigue abierta, intenta cerrarla de nuevo.", "error");
+        console.error(err);
       });
     }
 
@@ -205,7 +288,10 @@ function ingresarAApp() {
       document.getElementById('pantalla-cierre').classList.add('hidden');
       document.getElementById(p).classList.remove('hidden');
     }
-    function regresarAlLogin() { cambiarPantalla('pantalla-login'); }
+    function regresarAlLogin() {
+      clearInterval(timerInterval);
+      cambiarPantalla('pantalla-login');
+    }
   </script>
 </body>
 </html>
