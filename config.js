@@ -1,4 +1,4 @@
 const CONFIG_APP = {
     // Tu enlace absoluto del Web App de Google Sheets
-    URL_API_GOOGLE: "https://script.google.com/macros/s/AKfycbyw67_ZWXuVTQfeqjQUVOJKt3eVpawPxpJwPZ0esSXdef34MTKTwsGkaaqpUx5MeSWQDg/exec"
+    URL_API_GOOGLE: "https://script.google.com/macros/s/AKfycbyzICr2g8J104FDGQpHQmAXfaVbBwfmUdOrXeQhRuOqyqIwDwcctp_HQYXaJpOAgZnR4w/exec"
 };
