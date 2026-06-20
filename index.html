@@ -3,35 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Control de Productividad - CEDIS</title>
+  <title>Control de Productividad - iFull</title>
+  <link rel="icon" href="logo.png">
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>body { font-family: 'Poppins', sans-serif; }</style>
+  <style>
+    body { font-family: 'Poppins', sans-serif; }
+    :root {
+      --ifull-blue: #2F94F5;
+      --ifull-blue-dark: #1C76D6;
+      --ifull-orange: #DE8E23;
+    }
+  </style>
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col items-center p-4">
 
   <div class="w-full max-w-md bg-white rounded-3xl shadow-xl p-6 mt-4 border border-slate-200">
 
     <div class="text-center mb-6">
-      <h1 class="text-2xl font-bold text-slate-800">CEDIS - Inventarios</h1>
+      <img src="logo.png" alt="iFull" class="h-10 mx-auto mb-3">
+      <h1 class="text-2xl font-bold text-slate-800">iFull - Inventarios</h1>
       <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Mapeo de Tiempos Opex</p>
     </div>
 
     <div id="pantalla-login" class="space-y-4">
       <label class="block text-sm font-semibold text-slate-700">Identificación de Colaborador:</label>
-      <select id="select-usuario" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:outline-none font-medium text-slate-700">
+      <select id="select-usuario" onchange="mostrarPreviewUsuario()" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:outline-none font-medium text-slate-700" style="border-color:#e2e8f0;">
         <option value="">Conectando con Servidor...</option>
       </select>
-      <button onclick="ingresarAApp()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-blue-200">
+
+      <div id="preview-usuario" class="hidden bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-center gap-4">
+        <img id="img-preview" class="w-14 h-14 rounded-full object-cover border-2" style="border-color: var(--ifull-blue);" src="" alt="">
+        <div id="avatar-preview" class="hidden w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-lg" style="background: var(--ifull-blue);"></div>
+        <div>
+          <p id="nombre-preview" class="font-bold text-slate-800">-</p>
+          <p id="rol-preview" class="text-xs text-slate-500 font-medium">-</p>
+        </div>
+      </div>
+
+      <button onclick="ingresarAApp()" class="w-full text-white font-bold py-4 rounded-2xl transition shadow-lg" style="background: var(--ifull-blue); box-shadow: 0 10px 15px -3px rgba(47,148,245,0.3);" onmouseover="this.style.background='var(--ifull-blue-dark)'" onmouseout="this.style.background='var(--ifull-blue)'">
         Ingresar al Panel
       </button>
     </div>
 
     <div id="pantalla-operacion" class="hidden space-y-6">
       <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-        <div>
-          <h2 id="lbl-usuario" class="font-bold text-slate-800">-</h2>
-          <p id="lbl-rol" class="text-xs text-slate-500 font-medium">-</p>
+        <div class="flex items-center gap-3">
+          <img id="img-usuario-activo" class="hidden w-12 h-12 rounded-full object-cover border-2" style="border-color: var(--ifull-blue);" src="" alt="">
+          <div id="avatar-usuario-activo" class="hidden w-12 h-12 rounded-full flex items-center justify-center text-white font-bold" style="background: var(--ifull-blue);"></div>
+          <div>
+            <h2 id="lbl-usuario" class="font-bold text-slate-800">-</h2>
+            <p id="lbl-rol" class="text-xs text-slate-500 font-medium">-</p>
+          </div>
         </div>
         <button onclick="regresarAlLogin()" class="text-xs font-semibold text-red-500 bg-red-50 px-3 py-2 rounded-xl">Salir</button>
       </div>
@@ -42,7 +65,7 @@
       </div>
 
       <div id="box-cronometro" class="hidden bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-center space-y-4">
-        <span id="badge-reanudado" class="hidden inline-block bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase">Reanudado</span>
+        <span id="badge-reanudado" class="hidden inline-block text-white text-xs font-bold px-3 py-1 rounded-full uppercase" style="background: var(--ifull-orange);">Reanudado</span>
         <span id="badge-progreso" class="inline-block bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse uppercase">En Progreso</span>
         <h3 id="lbl-tarea-activa" class="font-bold text-lg text-emerald-900">-</h3>
         <p class="text-xs text-emerald-700">Iniciado a las: <span id="lbl-hora-inicio" class="font-bold">00:00:00</span></p>
@@ -59,7 +82,7 @@
         <p id="lbl-resumen-tarea" class="text-sm text-slate-500">-</p>
       </div>
       <div class="space-y-2">
-        <label class="block text-sm font-semibold text-slate-700">Cantidad Surtida / Procesada:</label>
+        <label class="block text-sm font-semibold text-slate-700">Cantidad Contada / Inventariada:</label>
         <input type="number" id="txt-cantidad" inputmode="numeric" placeholder="Ej. 450" class="w-full text-center text-3xl font-bold p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-emerald-500 focus:outline-none">
       </div>
       <div class="space-y-2">
@@ -121,7 +144,9 @@
     function mostrarBanner(msg, tipo = "info") {
       const card = document.getElementById('banner-card');
       card.className = "rounded-2xl shadow-xl p-4 text-sm font-semibold text-white flex justify-between items-start gap-3 " +
-        (tipo === "error" ? "bg-red-500" : tipo === "exito" ? "bg-emerald-600" : "bg-amber-500");
+        (tipo === "error" ? "bg-red-500" : tipo === "exito" ? "bg-emerald-600" : "");
+      if (tipo !== "error" && tipo !== "exito") card.style.background = "var(--ifull-orange)";
+      else card.style.background = "";
       document.getElementById('banner-msg').innerText = msg;
       document.getElementById('banner').classList.remove('hidden');
       clearTimeout(bannerTimeout);
@@ -135,6 +160,35 @@
       CONFIG.usuarios.forEach(u => {
         let o = document.createElement('option'); o.value = u; o.textContent = u; s.appendChild(o);
       });
+    }
+
+    function obtenerIniciales(nombre) {
+      return nombre.split(' ').filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('');
+    }
+
+    // Pinta foto + rol en cualquier par de elementos (img + avatar de iniciales como respaldo).
+    function pintarFotoYRol(nombre, datos, imgEl, avatarEl) {
+      if (datos && datos.foto) {
+        imgEl.src = datos.foto;
+        imgEl.classList.remove('hidden');
+        avatarEl.classList.add('hidden');
+      } else {
+        avatarEl.textContent = obtenerIniciales(nombre);
+        avatarEl.classList.remove('hidden');
+        imgEl.classList.add('hidden');
+      }
+    }
+
+    function mostrarPreviewUsuario() {
+      const u = document.getElementById('select-usuario').value;
+      const preview = document.getElementById('preview-usuario');
+      if (!u) { preview.classList.add('hidden'); return; }
+
+      const d = CONFIG.actividadesPorRol[u] || { rol: "Operador" };
+      document.getElementById('nombre-preview').innerText = u;
+      document.getElementById('rol-preview').innerText = d.rol || "Operador";
+      pintarFotoYRol(u, d, document.getElementById('img-preview'), document.getElementById('avatar-preview'));
+      preview.classList.remove('hidden');
     }
 
     function ingresarAApp() {
@@ -155,6 +209,7 @@
         const d = CONFIG.actividadesPorRol[u] || { rol: "Operador", tareas: [] };
         document.getElementById('lbl-usuario').innerText = u;
         document.getElementById('lbl-rol').innerText = d.rol || "Operador";
+        pintarFotoYRol(u, d, document.getElementById('img-usuario-activo'), document.getElementById('avatar-usuario-activo'));
 
         if (estado.tienePendiente) {
           mostrarCronometro(estado.actividad, estado.horaInicio, { reanudado: false });
@@ -164,7 +219,7 @@
           d.tareas.forEach(t => {
             let b = document.createElement('button');
             b.className = "w-full text-left p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-2xl font-semibold text-slate-700 flex justify-between items-center text-sm";
-            b.innerHTML = `<span>${t}</span> <span class="text-blue-500">▶</span>`;
+            b.innerHTML = `<span>${t}</span> <span style="color: var(--ifull-blue);">▶</span>`;
             b.onclick = () => ejecutarPlay(t);
             c.appendChild(b);
           });
