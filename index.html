@@ -109,20 +109,48 @@
       const u = document.getElementById('select-usuario').value;
       if (!u) return alert("Selecciona un operador.");
       usuarioActivo = u;
-      const d = CONFIG.actividadesPorRol[u] || { rol: "Operador", tareas: [] };
       
-      document.getElementById('lbl-usuario').innerText = u;
-      document.getElementById('lbl-rol').innerText = d.role || d.rol;
+      mostrarLoading("Verificando si tienes tareas pendientes...");
       
-      const c = document.getElementById('contenedor-botones'); c.innerHTML = "";
-      d.tareas.forEach(t => {
-        let b = document.createElement('button');
-        b.className = "w-full text-left p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-2xl font-semibold text-slate-700 flex justify-between items-center text-sm";
-        b.innerHTML = `<span>${t}</span> <span class="text-blue-500">▶</span>`;
-        b.onclick = () => ejecutarPlay(t);
-        c.appendChild(b);
+      fetch(CONFIG_APP.URL_API_GOOGLE, {
+        method: 'POST',
+        body: JSON.stringify({ accion: 'VERIFICAR', usuario: u })
+      })
+      .then(res => res.json())
+      .then(estado => {
+        ocultarLoading();
+        
+        const d = CONFIG.actividadesPorRol[u] || { rol: "Operador", tareas: [] };
+        document.getElementById('lbl-usuario').innerText = u;
+        document.getElementById('lbl-rol').innerText = d.rol || "Operador";
+        
+        if (estado.tienePendiente) {
+          tareaActiva = estado.actividad;
+          document.getElementById('lbl-tarea-activa').innerText = estado.actividad;
+          document.getElementById('lbl-hora-inicio').innerText = estado.horaInicio;
+          
+          document.getElementById('box-seleccion-tarea').classList.add('hidden');
+          document.getElementById('box-cronometro').classList.remove('hidden');
+          cambiarPantalla('pantalla-operacion');
+          
+          alert(`⚠️ Tienes una actividad pendiente en proceso:\n"${estado.actividad}"\nIniciada a las ${estado.horaInicio}. Por favor, termínala.`);
+        } else {
+          const c = document.getElementById('contenedor-botones'); c.innerHTML = "";
+          d.tareas.forEach(t => {
+            let b = document.createElement('button');
+            b.className = "w-full text-left p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-2xl font-semibold text-slate-700 flex justify-between items-center text-sm";
+            b.innerHTML = `<span>${t}</span> <span class="text-blue-500">▶</span>`;
+            b.onclick = () => ejecutarPlay(t);
+            c.appendChild(b);
+          });
+          document.getElementById('box-cronometro').classList.add('hidden');
+          document.getElementById('box-seleccion-tarea').classList.remove('hidden');
+          cambiarPantalla('pantalla-operacion');
+        }
+      }).catch(err => {
+        ocultarLoading();
+        alert("Error verificando estado: " + err);
       });
-      cambiarPantalla('pantalla-operacion');
     }
 
     function ejecutarPlay(t) {
