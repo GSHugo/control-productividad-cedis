@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Productividad - CEDIS</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Poppins', sans-serif; }</style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center p-4">
+
+  <div class="w-full max-w-md bg-white rounded-3xl shadow-xl p-6 mt-4 border border-slate-200">
+    
+    <div class="text-center mb-6">
+      <h1 class="text-2xl font-bold text-slate-800">CEDIS - Inventarios</h1>
+      <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Mapeo de Tiempos Opex</p>
+    </div>
+
+    <div id="pantalla-login" class="space-y-4">
+      <label class="block text-sm font-semibold text-slate-700">Identificación de Colaborador:</label>
+      <select id="select-usuario" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:outline-none font-medium text-slate-700">
+        <option value="">Conectando con Servidor...</option>
+      </select>
+      <button onclick="ingresarAApp()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-blue-200">
+        Ingresar al Panel
+      </button>
+    </div>
+
+    <div id="pantalla-operacion" class="hidden space-y-6">
+      <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
+        <div>
+          <h2 id="lbl-usuario" class="font-bold text-slate-800">-</h2>
+          <p id="lbl-rol" class="text-xs text-slate-500 font-medium">-</p>
+        </div>
+        <button onclick="regresarAlLogin()" class="text-xs font-semibold text-red-500 bg-red-50 px-3 py-2 rounded-xl">Salir</button>
+      </div>
+
+      <div id="box-seleccion-tarea" class="space-y-4">
+        <h3 class="text-sm font-semibold text-slate-700">¿Qué actividad vas a iniciar?</h3>
+        <div id="contenedor-botones" class="grid grid-cols-1 gap-3"></div>
+      </div>
+
+      <div id="box-cronometro" class="hidden bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-center space-y-4">
+        <span class="inline-block bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse uppercase">En Progreso</span>
+        <h3 id="lbl-tarea-activa" class="font-bold text-lg text-emerald-900">-</h3>
+        <p class="text-xs text-emerald-700">Iniciado a las: <span id="lbl-hora-inicio" class="font-bold">00:00:00</span></p>
+        <button onclick="abrirCierreActividad()" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-red-200">
+          ■ Finalizar Actividad
+        </button>
+      </div>
+    </div>
+
+    <div id="pantalla-cierre" class="hidden space-y-5">
+      <div class="text-center">
+        <h3 class="font-bold text-slate-800 text-lg">Cierre de Registro</h3>
+        <p id="lbl-resumen-tarea" class="text-sm text-slate-500">-</p>
+      </div>
+      <div class="space-y-2">
+        <label class="block text-sm font-semibold text-slate-700">Cantidad Surtida / Procesada:</label>
+        <input type="number" id="txt-cantidad" inputmode="numeric" placeholder="Ej. 450" class="w-full text-center text-3xl font-bold p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-emerald-500 focus:outline-none">
+      </div>
+      <div class="space-y-2">
+        <label class="block text-sm font-semibold text-slate-700">Comentarios / Folio Odoo:</label>
+        <input type="text" id="txt-comentarios" placeholder="Opcional..." class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none text-sm text-slate-700">
+      </div>
+      <button onclick="confirmarCierreActividad()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-emerald-200">
+        ✓ Guardar en MasterData
+      </button>
+    </div>
+
+  </div>
+
+  <div id="overlay" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex flex-col justify-center items-center text-white font-semibold z-50">
+    <div class="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mb-4"></div>
+    <p id="overlay-msg">Conectando...</p>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    let CONFIG = {}; let usuarioActivo = ""; let tareaActiva = "";
+
+    window.addEventListener('DOMContentLoaded', () => {
+      mostrarLoading("Cargando lista de operadores...");
+      fetch(CONFIG_APP.URL_API_GOOGLE)
+        .then(res => res.json())
+        .then(data => {
+          CONFIG = data;
+          inicializarSelector();
+          ocultarLoading();
+        }).catch(err => alert("Error conectando con el Sheet: " + err));
+    });
+
+    function mostrarLoading(msg) {
+      document.getElementById('overlay-msg').innerText = msg;
+      document.getElementById('overlay').classList.remove('hidden');
+    }
+    function ocultarLoading() { document.getElementById('overlay').classList.add('hidden'); }
+
+    function inicializarSelector() {
+      const s = document.getElementById('select-usuario');
+      s.innerHTML = '<option value="">-- Elige tu Nombre --</option>';
+      CONFIG.usuarios.forEach(u => {
+        let o = document.createElement('option'); o.value = u; o.textContent = u; s.appendChild(o);
+      });
+    }
+
+    function ingresarAApp() {
+      const u = document.getElementById('select-usuario').value;
+      if (!u) return alert("Selecciona un operador.");
+      usuarioActivo = u;
+      const d = CONFIG.actividadesPorRol[u] || { rol: "Operador", tareas: [] };
+      
+      document.getElementById('lbl-usuario').innerText = u;
+      document.getElementById('lbl-rol').innerText = d.role || d.rol;
+      
+      const c = document.getElementById('contenedor-botones'); c.innerHTML = "";
+      d.tareas.forEach(t => {
+        let b = document.createElement('button');
+        b.className = "w-full text-left p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-2xl font-semibold text-slate-700 flex justify-between items-center text-sm";
+        b.innerHTML = `<span>${t}</span> <span class="text-blue-500">▶</span>`;
+        b.onclick = () => ejecutarPlay(t);
+        c.appendChild(b);
+      });
+      cambiarPantalla('pantalla-operacion');
+    }
+
+    function ejecutarPlay(t) {
+      tareaActiva = t;
+      mostrarLoading("Sincronizando marca de Inicio...");
+      fetch(CONFIG_APP.URL_API_GOOGLE, {
+        method: 'POST',
+        body: JSON.stringify({ accion: 'PLAY', usuario: usuarioActivo, actividad: t })
+      }).then(res => res.json()).then(res => {
+        ocultarLoading();
+        if(res.status === 'ok') {
+          document.getElementById('lbl-tarea-activa').innerText = t;
+          document.getElementById('lbl-hora-inicio').innerText = res.horaInicio;
+          document.getElementById('box-seleccion-tarea').classList.add('hidden');
+          document.getElementById('box-cronometro').classList.remove('hidden');
+        } else { alert(res.message); }
+      });
+    }
+
+    function abrirCierreActividad() {
+      document.getElementById('lbl-resumen-tarea').innerText = "Terminaste: " + tareaActiva;
+      cambiarPantalla('pantalla-cierre');
+    }
+
+    function confirmarCierreActividad() {
+      const cant = document.getElementById('txt-cantidad').value;
+      const comm = document.getElementById('txt-comentarios').value;
+      if(!cant || cant <= 0) return alert("Coloca una cantidad válida.");
+      
+      mostrarLoading("Inyectando registros en MasterData...");
+      fetch(CONFIG_APP.URL_API_GOOGLE, {
+        method: 'POST',
+        body: JSON.stringify({ accion: 'STOP', usuario: usuarioActivo, cantidad: cant, comentarios: comm })
+      }).then(res => res.json()).then(res => {
+        ocultarLoading();
+        if(res.status === 'ok') {
+          alert(`¡Guardado con Éxito!\nTiempo registrado: ${res.tiempo}`);
+          document.getElementById('box-cronometro').classList.add('hidden');
+          document.getElementById('box-seleccion-tarea').classList.remove('hidden');
+          cambiarPantalla('pantalla-operacion');
+        } else { alert(res.message); }
+      });
+    }
+
+    function cambiarPantalla(p) {
+      document.getElementById('pantalla-login').classList.add('hidden');
+      document.getElementById('pantalla-operacion').classList.add('hidden');
+      document.getElementById('pantalla-cierre').classList.add('hidden');
+      document.getElementById(p).classList.remove('hidden');
+    }
+    function regresarAlLogin() { cambiarPantalla('pantalla-login'); }
+  </script>
+</body>
+</html>
